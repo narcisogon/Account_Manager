@@ -1,0 +1,26 @@
+# Build output
+build/
+*.o
+*.out
+*.exe
+*.a
+*.so
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# VSCode
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Secrets (don’t upload these)
+.env
+*.env
+*.pgpass
