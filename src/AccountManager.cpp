@@ -1,6 +1,6 @@
 #include "AccountManager.hpp"
 #include "Database.hpp"
-#include "authz.hpp"
+#include "Authz.hpp"
 #include "utils.hpp"
 #include <pqxx/pqxx>
 #include <iostream>

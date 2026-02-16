@@ -1,0 +1,12 @@
+build
+out
+bin
+obj
+.vscode
+.git
+*.o
+*.a
+*.so
+*.exe
+*.log
+.env

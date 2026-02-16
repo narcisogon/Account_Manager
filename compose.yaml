@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: accuser
+      POSTGRES_PASSWORD: accpass
+      POSTGRES_DB: accdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accuser -d accdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: accuser
+      PGPASSWORD: accpass
+      PGDATABASE: accdb
+    stdin_open: true
+    tty: true
+
+volumes:
+  pgdata:
