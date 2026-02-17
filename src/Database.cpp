@@ -47,7 +47,9 @@ void DB::prepare_statements() {
         "  JOIN auth.roles r ON r.role_id = ur.role_id "
         "  JOIN auth.role_permissions rp ON rp.role_id = r.role_id "
         "  JOIN auth.permissions p ON p.perm_id = rp.perm_id "
-        "  WHERE u.username = $1 AND p.perm_name = $2"
+        "  WHERE u.username = $1 "
+        "    AND u.is_active = TRUE "
+        "    AND p.perm_name = $2"
         ") AS has_permission;");
 
     m_conn.prepare("list_role_permissions",
