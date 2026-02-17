@@ -3,6 +3,7 @@
 #include "Audit.hpp"
 #include "AccountManager.hpp"
 #include "ConfigManager.hpp"
+#include "PasswordHasher.hpp"
 #include "utils.hpp"
 #include <string>
 #include <iostream>
@@ -15,6 +16,11 @@
 static bool is_known_command(const std::string& cmd) {
     static const std::unordered_set<std::string> commands = {
         "create-user",
+        "create-user-plain",
+        "verify-password",
+        "login",
+        "logout",
+        "validate-session",
         "disable-user",
         "assign-role",
         "list-user-roles",
@@ -94,6 +100,10 @@ static std::string make_details_json(std::initializer_list<std::pair<std::string
     return json;
 }
 
+static std::string token_prefix(const std::string& token) {
+    return token.size() <= 8 ? token : token.substr(0, 8);
+}
+
 static void print_help() {
     std::cout << R"(
 Usage:
@@ -102,6 +112,11 @@ Usage:
 
 User:
   create-user <actor> <username> <email> <password_hash>
+  create-user-plain <actor> <username> <email> <plain_password>
+  verify-password <username> <plain_password>
+  login <username> <plain_password> [ttl_minutes]
+  logout <session_token>
+  validate-session <session_token>
   disable-user <actor> <username>
   assign-role <actor> <username> <role_name>
   list-user-roles <username>
@@ -183,6 +198,112 @@ int main(int argc, char* argv[]) {
                 "",
                 make_details_json({{"username", username}, {"email", email}})
             );
+        }
+        else if (cmd == "create-user-plain") {
+            require_args(4, "create-user-plain <actor> <username> <email> <plain_password>");
+            const std::string actor = arg(0);
+            const std::string username = arg(1);
+            const std::string email = arg(2);
+            const std::string plain_password = arg(3);
+
+            if (plain_password.size() < 12) {
+                utils::fail("Password must be at least 12 characters.");
+            }
+
+            const std::string password_hash = password::hash_argon2id(plain_password);
+            accounts.create_user(actor, username, email, password_hash);
+            audit.write(
+                actor,
+                "create_user",
+                "auth.users",
+                "",
+                make_details_json({{"username", username}, {"email", email}, {"password_algo", "argon2id"}})
+            );
+        }
+        else if (cmd == "verify-password") {
+            require_args(2, "verify-password <username> <plain_password>");
+            const std::string username = arg(0);
+            const std::string plain_password = arg(1);
+
+            const bool verified = accounts.verify_password(username, plain_password);
+            audit.write(
+                username,
+                "verify_password",
+                "auth.users",
+                "",
+                make_details_json({{"username", username}, {"result", verified ? "success" : "failure"}})
+            );
+            if (!verified) {
+                return 1;
+            }
+        }
+        else if (cmd == "login") {
+            const std::string usage = "login <username> <plain_password> [ttl_minutes]";
+            if (!(argc == arg_base + 2 || argc == arg_base + 3)) {
+                utils::fail(usage);
+            }
+
+            const std::string username = arg(0);
+            const std::string plain_password = arg(1);
+            int ttl_minutes = 60;
+            if (argc == arg_base + 3) {
+                ttl_minutes = std::stoi(arg(2));
+            }
+
+            const std::string session_token = accounts.login(username, plain_password, ttl_minutes);
+            const bool success = !session_token.empty();
+            audit.write(
+                username,
+                "login",
+                "auth.sessions",
+                "",
+                make_details_json({
+                    {"username", username},
+                    {"result", success ? "success" : "failure"},
+                    {"ttl_minutes", std::to_string(ttl_minutes)}
+                })
+            );
+            if (!success) {
+                return 1;
+            }
+        }
+        else if (cmd == "logout") {
+            require_args(1, "logout <session_token>");
+            const std::string session_token = arg(0);
+            const bool success = accounts.logout(session_token);
+
+            audit.write(
+                "",
+                "logout",
+                "auth.sessions",
+                "",
+                make_details_json({
+                    {"session_prefix", token_prefix(session_token)},
+                    {"result", success ? "success" : "failure"}
+                })
+            );
+            if (!success) {
+                return 1;
+            }
+        }
+        else if (cmd == "validate-session") {
+            require_args(1, "validate-session <session_token>");
+            const std::string session_token = arg(0);
+            const bool valid = accounts.validate_session(session_token);
+
+            audit.write(
+                "",
+                "validate_session",
+                "auth.sessions",
+                "",
+                make_details_json({
+                    {"session_prefix", token_prefix(session_token)},
+                    {"result", valid ? "valid" : "invalid"}
+                })
+            );
+            if (!valid) {
+                return 1;
+            }
         }
         else if (cmd == "disable-user") {
             require_args(2, "disable-user <actor> <username>");

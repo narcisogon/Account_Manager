@@ -31,6 +31,33 @@ void DB::prepare_statements() {
         "WHERE u.username = $1 AND u.is_active = TRUE "
         "ON CONFLICT DO NOTHING;");
 
+    m_conn.prepare("get_user_auth_record",
+        "SELECT password_hash, is_active "
+        "FROM auth.users "
+        "WHERE username = $1;");
+
+    m_conn.prepare("create_session",
+        "INSERT INTO auth.sessions (user_id, session_token, expires_at) "
+        "SELECT u.user_id, gen_random_uuid()::text, NOW() + ($2::int * INTERVAL '1 minute') "
+        "FROM auth.users u "
+        "WHERE u.username = $1 AND u.is_active = TRUE "
+        "RETURNING session_token, expires_at;");
+
+    m_conn.prepare("revoke_session",
+        "UPDATE auth.sessions "
+        "SET revoked_at = NOW() "
+        "WHERE session_token = $1 "
+        "  AND revoked_at IS NULL "
+        "  AND expires_at > NOW();");
+
+    m_conn.prepare("check_session",
+        "SELECT u.username, u.is_active, "
+        "       (s.expires_at <= NOW()) AS is_expired, "
+        "       (s.revoked_at IS NOT NULL) AS is_revoked "
+        "FROM auth.sessions s "
+        "JOIN auth.users u ON u.user_id = s.user_id "
+        "WHERE s.session_token = $1;");
+
     m_conn.prepare("list_user_roles",
         "SELECT r.role_name "
         "FROM auth.users u "
@@ -115,8 +142,13 @@ void DB::prepare_statements() {
     // AUDIT
     m_conn.prepare("write_audit",
         "INSERT INTO auth.audit_log (actor_user_id, action, target_table, target_id, details) "
-        "SELECT u.user_id, $2, $3, NULLIF($4, '')::uuid, $5::jsonb "
-        "FROM auth.users u WHERE u.username = $1;");
+        "VALUES ("
+        "  (SELECT u.user_id FROM auth.users u WHERE u.username = $1), "
+        "  $2, "
+        "  $3, "
+        "  NULLIF($4, '')::uuid, "
+        "  $5::jsonb"
+        ");");
 
     m_conn.prepare("show_audit",
         "SELECT a.created_at, u.username AS actor, a.action, a.target_table, a.target_id, a.details "

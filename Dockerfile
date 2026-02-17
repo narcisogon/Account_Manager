@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     build-essential cmake pkg-config \
-    libpq-dev libpqxx-dev postgresql-client \
+    libpq-dev libpqxx-dev libargon2-dev postgresql-client \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

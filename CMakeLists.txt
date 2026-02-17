@@ -15,8 +15,9 @@ add_executable(accountmgr
     src/Audit.cpp
     src/AccountManager.cpp
     src/ConfigManager.cpp
+    src/PasswordHasher.cpp
 )
 
 target_include_directories(accountmgr PRIVATE include ${PQXX_INCLUDE_DIRS})
-target_link_libraries(accountmgr PRIVATE ${PQXX_LIBRARIES})
+target_link_libraries(accountmgr PRIVATE ${PQXX_LIBRARIES} argon2)
 target_compile_options(accountmgr PRIVATE ${PQXX_CFLAGS_OTHER})
