@@ -34,7 +34,11 @@ void AccountManager::disable_user(const std::string& actor, const std::string& u
 
     pqxx::work tx(m_db.conn());
     auto r = tx.exec_prepared("disable_user", username);
-    utils::ok("Disabled '" + username + "' (rows=" + std::to_string(r.affected_rows()) + ")");
+    if (r.affected_rows() == 0) {
+        utils::info("No active user '" + username + "' found.");
+    } else {
+        utils::ok("Disabled '" + username + "'");
+    }
     tx.commit();
 }
 
@@ -43,8 +47,12 @@ void AccountManager::assign_role(const std::string& actor, const std::string& us
     require(actor, "manage_roles");
 
     pqxx::work tx(m_db.conn());
-    tx.exec_prepared("assign_role", username, role_name);
-    utils::ok("Assigned role '" + role_name + "' to '" + username + "'");
+    auto r = tx.exec_prepared("assign_role", username, role_name);
+    if (r.affected_rows() == 0) {
+        utils::info("No role assignment changed for '" + username + "' and role '" + role_name + "'");
+    } else {
+        utils::ok("Assigned role '" + role_name + "' to '" + username + "'");
+    }
     tx.commit();
 }
 

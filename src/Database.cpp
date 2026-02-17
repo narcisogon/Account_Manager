@@ -21,13 +21,14 @@ void DB::prepare_statements() {
         "RETURNING user_id;");
 
     m_conn.prepare("disable_user",
-        "UPDATE auth.users SET is_active = FALSE WHERE username = $1;");
+        "UPDATE auth.users SET is_active = FALSE "
+        "WHERE username = $1 AND is_active = TRUE;");
 
     m_conn.prepare("assign_role",
         "INSERT INTO auth.user_roles (user_id, role_id) "
         "SELECT u.user_id, r.role_id "
         "FROM auth.users u JOIN auth.roles r ON r.role_name = $2 "
-        "WHERE u.username = $1 "
+        "WHERE u.username = $1 AND u.is_active = TRUE "
         "ON CONFLICT DO NOTHING;");
 
     m_conn.prepare("list_user_roles",
@@ -99,6 +100,7 @@ void DB::prepare_statements() {
         "SELECT u.user_id, h.host_id, $3 "
         "FROM auth.users u JOIN cfg.hosts h "
         "ON u.username = $1 AND h.hostname = $2 "
+        "WHERE u.is_active = TRUE "
         "ON CONFLICT (user_id, host_id) DO UPDATE "
         "SET access_level = EXCLUDED.access_level;");
 
@@ -113,7 +115,7 @@ void DB::prepare_statements() {
     // AUDIT
     m_conn.prepare("write_audit",
         "INSERT INTO auth.audit_log (actor_user_id, action, target_table, target_id, details) "
-        "SELECT u.user_id, $2, $3, $4::uuid, $5::jsonb "
+        "SELECT u.user_id, $2, $3, NULLIF($4, '')::uuid, $5::jsonb "
         "FROM auth.users u WHERE u.username = $1;");
 
     m_conn.prepare("show_audit",

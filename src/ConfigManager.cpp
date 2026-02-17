@@ -64,8 +64,12 @@ void ConfigManager::set_profile_setting(const std::string& actor,
     require(actor, "apply_config_profiles");
 
     pqxx::work tx(m_db.conn());
-    tx.exec_prepared("set_profile_setting", profile_name, setting_key, json_value);
-    utils::ok("Set setting '" + setting_key + "' for profile '" + profile_name + "'");
+    auto r = tx.exec_prepared("set_profile_setting", profile_name, setting_key, json_value);
+    if (r.affected_rows() == 0) {
+        utils::info("No setting updated: profile '" + profile_name + "' not found.");
+    } else {
+        utils::ok("Set setting '" + setting_key + "' for profile '" + profile_name + "'");
+    }
     tx.commit();
 }
 
@@ -74,8 +78,12 @@ void ConfigManager::apply_profile(const std::string& actor,
     require(actor, "apply_config_profiles");
 
     pqxx::work tx(m_db.conn());
-    tx.exec_prepared("apply_profile", hostname, profile_name);
-    utils::ok("Applied profile '" + profile_name + "' to host '" + hostname + "'");
+    auto r = tx.exec_prepared("apply_profile", hostname, profile_name);
+    if (r.affected_rows() == 0) {
+        utils::info("No profile assignment changed for host '" + hostname + "' and profile '" + profile_name + "'");
+    } else {
+        utils::ok("Applied profile '" + profile_name + "' to host '" + hostname + "'");
+    }
     tx.commit();
 }
 
@@ -86,8 +94,12 @@ void ConfigManager::grant_host_access(const std::string& actor,
     require(actor, "manage_hosts");
 
     pqxx::work tx(m_db.conn());
-    tx.exec_prepared("grant_host_access", username, hostname, access_level);
-    utils::ok("Granted " + access_level + " access for '" + username + "' on '" + hostname + "'");
+    auto r = tx.exec_prepared("grant_host_access", username, hostname, access_level);
+    if (r.affected_rows() == 0) {
+        utils::info("No host access changed for user '" + username + "' on '" + hostname + "'");
+    } else {
+        utils::ok("Granted " + access_level + " access for '" + username + "' on '" + hostname + "'");
+    }
     tx.commit();
 }
 
